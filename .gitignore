@@ -1,0 +1,8 @@
+
+.release-private/
+build/
+*.apk
+local.properties
+.gradle/
+.kotlin/
+*.idsig
