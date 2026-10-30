@@ -53,7 +53,7 @@ class ProgressDashboard(
     private val activity: Activity, private val prefs: SharedPreferences, private val page: LinearLayout, private val state: ProgressUiState,
     private val navigate: (String) -> Unit, private val refresh: () -> Unit,
     private val choosePhoto: (String) -> Unit, private val openPhoto: (Uri) -> Unit,
-    private val loadImage: (ImageView, String) -> Unit, private val catalogue: () -> Unit, private val export: () -> Unit
+    private val loadImage: (ImageView, String) -> Unit, private val catalogue: () -> Unit, private val export: () -> Unit, private val openSports: () -> Unit
 ) {
     private val lime = Color.rgb(159, 250, 77)
     private val ink = Color.rgb(5, 22, 12)
@@ -135,6 +135,9 @@ class ProgressDashboard(
         }
     }
     private fun overview() {
+        val sports=card();heading(sports,"Sports activity")
+        add(sports,SportsIntegration.statusView(activity,Color.WHITE),8)
+        add(sports,button("Workout History & Performance") { openSports() },8)
         val journey=card();heading(journey,"Your Progress")
         val start=if(prefs.contains("challenge-start-ms"))prefs.getLong("challenge-start-ms",0) else null
         val percent=ChallengeClock.percent(start)

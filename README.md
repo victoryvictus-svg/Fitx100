@@ -121,3 +121,9 @@ Sports now opens a native forest-green/lime workout dashboard inspired by the su
 Artwork is an original native barbell illustration; the reference's exercise photographs are not bundled. Exercise instructions beyond bench press and plank are labelled general training cues. Steps, heart rate and calorie burn are not simulated. Workout and rest timestamps, set records and selections persist locally. Workout duration is saved to the existing sports history on explicit completion. The challenge is not started by logging workouts.
 
 Validation: Kotlin/API 35 compilation and signed APK verification passed. No emulator or physical device was connected for this update, so visual layout and touch interaction validation remain outstanding. Install the version-code-10 Fit100-v1.0-upgrade.apk over the prior workspace installation to preserve its data.
+
+## Sports module (version code 11)
+
+Sports now contains six dedicated trackers, pause-safe workout and rest timers, optional sensor steps, permission-gated outdoor GPS walking/jogging through a foreground service, editable weekly plans, recovery checklists, reviewed/idempotent session saves, corrected/deleted history and interactive analytics. SQLite stores Sports session aggregates and imports legacy activity/set records without removing existing preferences. Home, Progress and Profile use the shared Sports data and settings; Diet is unchanged.
+
+Build, test commands, architecture, step-by-step changes and verification limits are documented in [SPORTS-IMPLEMENTATION.md](SPORTS-IMPLEMENTATION.md). Install `Fit100-sports-debug.apk` for the updated debug build. `Fit100-sports-instrumented.apk` is only for the automated test emulator. Neither includes test workout data.

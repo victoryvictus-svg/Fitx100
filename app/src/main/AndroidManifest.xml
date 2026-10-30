@@ -4,11 +4,21 @@
 <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 <uses-permission android:name="android.permission.CAMERA"/>
 <uses-feature android:name="android.hardware.camera.any" android:required="false"/>
+<uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH"/>
+<uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false"/>
+<uses-feature android:name="android.hardware.location.gps" android:required="false"/>
 <application android:allowBackup="false" android:label="Fit100" android:icon="@mipmap/ic_launcher" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:supportsRtl="true">
 <activity android:name=".MainActivity" android:exported="true" android:enableOnBackInvokedCallback="true" android:resizeableActivity="true" android:windowSoftInputMode="adjustResize"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
 <provider android:name=".ProfilePhotoProvider" android:authorities="com.fit100.tracker.profilephotos" android:exported="false" android:grantUriPermissions="true"/>
 <receiver android:name=".ReminderReceiver" android:exported="false"/>
 <receiver android:name=".BootReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter></receiver>
+<service android:name=".SportsTrackingService" android:exported="false" android:foregroundServiceType="location|health"/>
+<receiver android:name=".SportsAlarmReceiver" android:exported="false"/>
 </application>
 <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 </manifest>

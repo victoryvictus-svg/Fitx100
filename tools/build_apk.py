@@ -17,7 +17,7 @@ classes=out/'classes'
 assert classes.resolve().is_relative_to(out.resolve())
 if classes.exists(): shutil.rmtree(classes)
 classes.mkdir(exist_ok=True)
-run(['java','-cp',os.pathsep.join(map(str,compiler)), 'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler','-no-stdlib','-no-reflect','-jvm-target','17','-classpath',str(android)+os.pathsep+str(stdlib),'-d',classes,*sorted((root/'app/src/main/java').rglob('*.kt'))])
+run(['java','-cp',os.pathsep.join(map(str,compiler)), 'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler','-no-stdlib','-no-reflect','-jvm-target','17','-classpath',str(android)+os.pathsep+str(stdlib),'-d',classes,*sorted((root/'app/src/main/java').rglob('*.kt')), *([root/'tests/android/SportsInstrumentation.kt'] if '--instrumented' in sys.argv else [])])
 with zipfile.ZipFile(out/'classes.jar','w',zipfile.ZIP_DEFLATED) as archive:
  for file in classes.rglob('*.class'): archive.write(file,file.relative_to(classes).as_posix())
 ns='http://schemas.android.com/apk/res/android'
@@ -32,6 +32,8 @@ m.set('{'+ns+'}versionCode',version_code)
 m.set('{'+ns+'}versionName',version_name)
 m.insert(0, ET.Element('uses-sdk',{'{'+ns+'}minSdkVersion':'26','{'+ns+'}targetSdkVersion':'35'}))
 m.find('application').set('{'+ns+'}debuggable','true' if '--qa' in sys.argv else 'false')
+if '--instrumented' in sys.argv:
+ ET.SubElement(m,'instrumentation',{'{'+ns+'}name':'com.fit100.tracker.SportsInstrumentation','{'+ns+'}targetPackage':'com.fit100.tracker'})
 manifest.write(out/'AndroidManifest.xml',encoding='utf-8',xml_declaration=True)
 run([bt/'aapt2.exe','compile','--dir',root/'app/src/main/res','-o',out/'resources.zip'])
 run([bt/'aapt2.exe','link','-o',out/'unsigned.apk','--manifest',out/'AndroidManifest.xml','-I',android,out/'resources.zip'])
@@ -44,7 +46,7 @@ def sign_apk(path,keystore,alias,password):
  run(['java','-jar',bt/'lib/apksigner.jar','sign','--ks',keystore,'--ks-key-alias',alias,'--ks-pass',password,'--out',path,out/'aligned.apk'])
  run(['java','-jar',bt/'lib/apksigner.jar','verify','--verbose',path])
 if '--qa' in sys.argv:
- path=root/f'Fit100-v{version_name}-qa.apk'
+ path=root/('Fit100-sports-instrumented.apk' if '--instrumented' in sys.argv else 'Fit100-sports-debug.apk')
  sign_apk(path,Path.home()/'.android/debug.keystore','androiddebugkey','pass:android')
  print('QA APK:',path)
 else:

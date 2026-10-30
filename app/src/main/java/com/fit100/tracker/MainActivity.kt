@@ -64,6 +64,7 @@ class BootReceiver : android.content.BroadcastReceiver() {
 }
 
 class MainActivity : Activity() {
+    private var sportsSteps: SportsStepMonitor? = null
     private val prefs by lazy { getSharedPreferences("fit100", MODE_PRIVATE) }
     private lateinit var page: LinearLayout
     private lateinit var host: LinearLayout
@@ -341,8 +342,9 @@ class MainActivity : Activity() {
         outState.putStringArrayList("sections", ArrayList(expandedSections))
         super.onSaveInstanceState(outState)
     }
-    override fun onResume() { super.onResume();challengeHandler.removeCallbacks(challengeTick);if(::safeRoot.isInitialized && ::page.isInitialized)render();challengeHandler.postDelayed(challengeTick,60000) }
+    override fun onResume() { super.onResume();SportsHub.recover(this);if(intent.getBooleanExtra("open-sports",false)){tab=5;intent.removeExtra("open-sports")};sportsSteps?.stop();if(prefs.getBoolean("sports-step-enabled",false)){sportsSteps=SportsStepMonitor(this);sportsSteps?.start()};challengeHandler.removeCallbacks(challengeTick);if(::safeRoot.isInitialized && ::page.isInitialized)render();challengeHandler.postDelayed(challengeTick,60000) }
     override fun onPause() {
+        sportsSteps?.stop()
         challengeHandler.removeCallbacks(challengeTick)
         backNavigation.reset()
         exitHint?.cancel()
@@ -357,11 +359,16 @@ class MainActivity : Activity() {
         val previousScroll = if (renderedTab == tab) pageScroll?.scrollY ?: 0 else 0
         renderedTab = tab
         host = column().apply {
-            background = if (tab == 0 || tab == 1 || tab == 2 || tab == 5 || (tab == 3 && profileScreen == "Profile")) GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(forest, Color.rgb(23, 58, 31)))
+            background = if(tab==5) GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.rgb(6,20,12),Color.rgb(6,20,12))) else if (tab == 0 || tab == 1 || tab == 2 || tab == 5 || (tab == 3 && profileScreen == "Profile")) GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(forest, Color.rgb(23, 58, 31)))
                 else GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.rgb(228, 240, 217), BG))
         }
         val top = row().apply { setPadding(dp(22), dp(17), dp(22), dp(13)); setBackgroundColor(INK) }
-        if(tab==1 && dietState.screen!="Meal Plan") {
+        val sportsScreen=prefs.getString("workout-screen","Workout")?:"Workout"
+        if(tab==5 && sportsScreen !in listOf("Workout","Exercises","Plans","Activity","Activity Log","Stats")) {
+            top.addView(text("\u2039",32f,lime,true).apply { gravity=Gravity.CENTER;minimumWidth=dp(48);minimumHeight=dp(48);contentDescription="Back to Sports";isFocusable=true;setOnClickListener { handleBack() } })
+            val title=when { sportsScreen=="Session"->SportsHub.repo(this).active()?.name?:"Exercise Tracker";sportsScreen.startsWith("Exercise:")->SportsExercises.all.find { it.id==sportsScreen.removePrefix("Exercise:") }?.name?:"Exercise";sportsScreen.startsWith("History:")->"Session Details";sportsScreen=="Summary"->"Workout Summary";else->sportsScreen }
+            top.addView(text(title,20f,Color.WHITE,true),LinearLayout.LayoutParams(0,-2,1f))
+        } else if(tab==1 && dietState.screen!="Meal Plan") {
             top.addView(text("\u2039",32f,lime,true).apply { gravity=Gravity.CENTER;minimumWidth=dp(48);minimumHeight=dp(48);contentDescription="Back to Meal Plan";setOnClickListener { handleBack() } })
             top.addView(text(dietState.screen,20f,Color.WHITE,true),LinearLayout.LayoutParams(0,-2,1f))
         } else if (tab == 2 && progressState.screen != "Overview") {
@@ -374,18 +381,18 @@ class MainActivity : Activity() {
             })
             top.addView(text(profileScreen, 20f, Color.WHITE, true), LinearLayout.LayoutParams(0, -2, 1f))
         } else {
-            if ((tab == 0 || (tab == 2 && progressState.screen == "Overview")) && !compact) top.addView(ImageView(this).apply {
+            if ((tab == 0 || tab == 5 || (tab == 2 && progressState.screen == "Overview")) && !compact) top.addView(ImageView(this).apply {
                 setImageDrawable(FitIconDrawable("leaf", lime)); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }, LinearLayout.LayoutParams(dp(32), dp(40)).apply { marginEnd = dp(8) })
             val brand = column()
             add(brand, text("Fit100", 28f, lime, true).apply {
-                if (tab == 0 || (tab == 2 && progressState.screen == "Overview")) this.text = android.text.SpannableString("Fit100").apply {
+                if (tab == 0 || tab == 5 || (tab == 2 && progressState.screen == "Overview")) this.text = android.text.SpannableString("Fit100").apply {
                     setSpan(android.text.style.ForegroundColorSpan(Color.WHITE), 0, 3, 0)
                 }
             })
             add(brand, text("A BETTER YOU TOMORROW", 9f, Color.LTGRAY), 2)
             top.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
-            if (tab == 0 || (tab == 2 && progressState.screen == "Overview")) {
+            if (tab == 0 || tab == 5 || (tab == 2 && progressState.screen == "Overview")) {
                 top.addView(ImageView(this).apply {
                     setImageDrawable(FitIconDrawable("bell", Color.WHITE)); background = rounded(forest, 14)
                     setPadding(dp(11), dp(11), dp(11), dp(11)); contentDescription = "Smart reminders"; isFocusable = true
@@ -650,7 +657,7 @@ class MainActivity : Activity() {
         val date = LocalDate.now()
         val calories = prefs.getString("$date-cal", "0")?.toDoubleOrNull()?.toInt() ?: 0
         val protein = prefs.getString("$date-protein", "0")?.toDoubleOrNull()?.toInt() ?: 0
-        val tasks = (0..6).count { prefs.getBoolean("$date-task-$it", false) }
+        val tasks = (0..6).count { (prefs.getBoolean("$date-task-$it", false) || (it==4 && SportsIntegration.completed(this@MainActivity,date))) }
         val values = listOf(calories, protein, waterToday(), tasks)
         val targets = listOf(calorieTarget(), proteinTarget(), waterGoal(), 7)
         val names = listOf("Calories", "Protein", "Water", "Tasks")
@@ -681,7 +688,7 @@ class MainActivity : Activity() {
         }
         val head = row()
         head.addView(homeIcon("workout", forest, 28).apply { background = rounded(lime, 24); setPadding(dp(10), dp(10), dp(10), dp(10)) }, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(12) })
-        val labels = column(); add(labels, text(if (isRest()) "Rest Day" else "Gym Day", 18f, INK, true)); add(labels, text(workout(), 12f, MUTED), 4)
+        val labels = column(); add(labels, text(if (SportsHub.repo(this).plan(LocalDate.now().dayOfWeek.value).recovery) "Rest Day" else "Workout Day", 18f, INK, true)); add(labels, text(SportsHub.repo(this).plan(LocalDate.now().dayOfWeek.value).name, 12f, MUTED), 4)
         head.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
         head.addView(text("\u203a", 28f, INK).apply { minimumWidth = dp(36); gravity = Gravity.CENTER })
         head.minimumHeight = dp(48); head.isFocusable = true; head.setOnClickListener { showWorkoutPlan() }
@@ -693,6 +700,8 @@ class MainActivity : Activity() {
             targets.addView(cell, LinearLayout.LayoutParams(0, -2, 1f))
         }
         add(plan, targets, 6)
+        add(plan,SportsIntegration.statusView(this,Color.rgb(14,45,22)),8)
+        add(plan,pill("Open Sports Workout",{tab=5;prefs.edit().putString("workout-screen","Workout").apply();render()}),8)
     }
     private fun homeSchedule(parent: LinearLayout) {
         val card = homeCard(parent, false, 14)
@@ -735,10 +744,11 @@ class MainActivity : Activity() {
             line.addView(CheckBox(this).apply {
                 minimumWidth = dp(48); minimumHeight = dp(48); contentDescription = "Complete $title"
                 buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(43, 99, 26))
-                isChecked = prefs.getBoolean("$date-task-$i", false)
+                isChecked = prefs.getBoolean("$date-task-$i", false) || (i==4 && SportsIntegration.completed(this@MainActivity,date))
+                if(i==4 && SportsIntegration.completed(this@MainActivity,date)){isEnabled=false;contentDescription="Workout completed in Sports; edit its history to correct it"}
                 setOnCheckedChangeListener { _, checked ->
                     prefs.edit().putBoolean("$date-task-$i", checked).apply()
-                    val count = (0..6).count { prefs.getBoolean("$date-task-$it", false) }
+                    val count = (0..6).count { (prefs.getBoolean("$date-task-$it", false) || (it==4 && SportsIntegration.completed(this@MainActivity,date))) }
                     homeTasksValue?.text = "$count / 7"; homeTasksBar?.progress = count; homeTasksRing?.background = HomeArt("ring", count / 7f, Color.rgb(31, 215, 219))
                 }
             })
@@ -889,22 +899,14 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    private fun showWorkoutPlan() {
-        val exercises = if (isRest()) "Recovery day\nOptional gentle walk\n10-15 minutes mobility" else when (LocalDate.now().dayOfWeek) {
-            DayOfWeek.MONDAY, DayOfWeek.THURSDAY -> "Bench press: 3 × 8–12\nLat pulldown: 3 × 10–12\nSeated row: 3 × 10–12\nShoulder press: 3 × 8–12"
-            DayOfWeek.TUESDAY, DayOfWeek.FRIDAY -> "Leg press: 3 × 8–12\nRomanian deadlift: 3 × 8–12\nLeg curl: 3 × 10–12\nCalf raises: 3 × 12–15"
-            DayOfWeek.SATURDAY -> "Goblet squat: 3 × 10\nIncline press: 3 × 10\nCable row: 3 × 12\nPlank: 3 × 30 seconds"
-            else -> "Goblet squat: 3 x 10\nIncline press: 3 x 10\nCable row: 3 x 12\nPlank: 3 x 30 seconds"
-        }
-        AlertDialog.Builder(this).setTitle(workout()).setMessage(exercises).setPositiveButton("Done",null).show()
-    }
+    private fun showWorkoutPlan() { pauseTimer();tab=5;prefs.edit().putString("workout-screen","Workout").apply();render() }
     private fun meals() { DietDashboard(this,prefs,page,dietState,{ openDiet(it) },{ render() }).render() }
     private fun progress() {
         ProgressDashboard(this,prefs,page,progressState,
             { openProgress(it) }, { render() }, { choosePhoto(it) }, { openPhoto(it) },
             { image,uri -> loadProfileImage(image,uri) }, { openCatalogue() }, {
                 startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE);type="text/csv";putExtra(Intent.EXTRA_TITLE,"Fit100-${LocalDate.now()}.csv") },81)
-            }).render()
+            }, { tab=5;prefs.edit().putString("workout-screen","Stats").apply();render() }).render()
     }
     private fun settingRow(parent: LinearLayout, title: String, detail: String, action: () -> Unit) {
         val line = row().apply { minimumHeight = dp(64); isFocusable = true; setPadding(dp(4), dp(13), dp(4), dp(13)); setOnClickListener { action() } }
@@ -1157,6 +1159,7 @@ class MainActivity : Activity() {
     }
     override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,grantResults:IntArray) {
         super.onRequestPermissionsResult(requestCode,permissions,grantResults)
+        if(requestCode in 701..703) { if(requestCode==702 && grantResults.firstOrNull()==PackageManager.PERMISSION_GRANTED){prefs.edit().putBoolean("sports-step-enabled",true).apply();sportsSteps?.stop();sportsSteps=SportsStepMonitor(this);sportsSteps?.start()};Toast.makeText(this,if(grantResults.any { it==PackageManager.PERMISSION_GRANTED })"Access updated. Start the tracker when ready." else "Access declined. Manual tracking remains available.",Toast.LENGTH_LONG).show();render();return }
         if(requestCode==5) { scheduleReminders(this);return }
         if(requestCode==6) {
             if(grantResults.firstOrNull()==PackageManager.PERMISSION_GRANTED)launchCamera()
@@ -1191,6 +1194,7 @@ class MainActivity : Activity() {
     }
     private fun workoutForm() {
         val card = panel(page, top = 14)
+        add(card,text("Sports schedule: ${(1..7).count { !SportsHub.repo(this).plan(it).recovery }} workout days / week",13f,MUTED),8)
         choices(card, "Gym frequency (days per week)", "profile-gymdays", "5", (1..7).map { it.toString() })
         choices(card, "Rest days", "profile-rest", "Wednesday, Sunday", listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"), true)
         formField(card, "Workout duration (minutes)", "profile-duration", "60", true)
@@ -1198,7 +1202,9 @@ class MainActivity : Activity() {
         choices(card, "Preferred workout type", "profile-workout-type", "Strength", listOf("Strength", "Cardio", "Both"))
         formField(card, "Training goal", "profile-training-goal", "Fat loss + muscle retention")
         formField(card, "Gym location (optional)", "profile-gym-location", "")
-        add(page, profileButton("Save Changes", { saveProfile(listOf("profile-gymdays", "profile-rest", "profile-duration", "profile-timer", "profile-workout-type", "profile-training-goal", "profile-gym-location"), setOf("profile-duration", "profile-timer"), setOf("profile-duration", "profile-timer")) }), 20)
+        add(page, profileButton("Sports Goals & Exercise Targets", { tab=5;prefs.edit().putString("workout-screen","Settings").apply();render() }),12)
+        formField(card, "Preferred workout time", "sports-preferred-time", "17:00")
+        add(page, profileButton("Save Changes", { saveProfile(listOf("sports-preferred-time", "profile-gymdays", "profile-rest", "profile-duration", "profile-timer", "profile-workout-type", "profile-training-goal", "profile-gym-location"), setOf("profile-duration", "profile-timer"), setOf("profile-duration", "profile-timer")) }), 20)
     }
     private fun remindersForm() {
         val master = panel(page, Color.rgb(232, 243, 225))
@@ -1337,6 +1343,7 @@ class MainActivity : Activity() {
                     prefs.all.toSortedMap().forEach { (key, value) ->
                         if (!key.contains("photo")) writer.appendLine("${csv(key)},${csv(value.toString())}")
                     }
+                    SportsHub.repo(this).history().forEach { session -> writer.appendLine("${csv("sports-session-"+session.id)},${csv("${session.name};${session.started};${session.timer.accumulated};${session.repetitions};${session.distance};${session.calories}")}") }
                 } ?: error("No export destination")
                 Toast.makeText(this, "CSV exported", Toast.LENGTH_SHORT).show()
             } catch (_: Exception) { Toast.makeText(this, "Could not export. Please choose another location.", Toast.LENGTH_LONG).show() }
